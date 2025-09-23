@@ -32,8 +32,8 @@ driver.verify_connectivity(database=database_name)
 
 
 # Reuqest and Response Models (Pydantic)
-class AccountRequest(BaseModel):
-    accountNumber: str = Field(..., description = "The Account Number to investigate")
+class ClientRequest(BaseModel):
+    client_id: str = Field(..., description = "Client identifier")
 
 class CypherRequest(BaseModel):
     query: str = Field(..., description = "The Cypher query to execute")
@@ -85,12 +85,12 @@ def run_cypher(query: str, parameters: dict = {}):
 
 
 @mcp.tool()
-async def where_is_the_money_coming_from(request: AccountRequest, ctx: Context):
+async def where_is_the_money_coming_from(request: ClientRequest, ctx: Context):
     """
-    Find where the money is coming from given an account
+    Find where the money is coming from given an client_id
     
     Args:
-        request: AccountRequest object containing the account number
+        request: ClientRequest object containing the client_id
     
     Returns:
         List containing distnace from the account (number of hops away), 
@@ -99,55 +99,50 @@ async def where_is_the_money_coming_from(request: AccountRequest, ctx: Context):
     logger.log(logging.INFO, f"Session ID: {ctx.session_id} Client ID: {ctx.client_id}")
     return run_cypher_(
         '''//cypher
-            match p=(c:Account)(
-                ()-[:PERFORM]->(tx1:Transaction)-[:BENEFITS_TO]->()
-            ){1,3}(c2:Account{accountNumber: $accountNumber})
+            match p=(c:Client)(
+                ()-[:PERFORMED]->(tx1:Transaction)-[:TO]->()
+            ){1,3}(c2:Client{id: $client_id})
             return 
                 length(p)/2 as number_of_hops_away,
                 sum(count{ unwind [x in nodes(p) where x:Transaction] as tx return distinct tx  }) as number_of_transactions,
                 count(distinct c) as distinct_accounts
         ''',
-        parameters={"accountNumber": request.accountNumber}, #"ACC_MULE_129"
+        parameters={"client_id": request.client_id} # 4307389536474215 Evan Pacheco
     )
 
 @mcp.tool()
-async def customer_overview(request: AccountRequest, ctx: Context):
+async def client_overview(request: ClientRequest, ctx: Context):
     """
-    Find customer information and account overview given an account number
+    Find client information given a client_id
     
     Args:
-        request: AccountRequest object containing the account number
+        request: ClientRequest object containing the client_id
     
     Returns:
-        Dictionary containing customer information and list of accounts
+        Dictionary containing customer information, total money sent, total money received,
+        and whether SSN, email, or phone is shared with other clients (boolan true would 
+        indicate potential fraud)
     """
     logger.log(logging.INFO, f"Session ID: {ctx.session_id} Client ID: {ctx.client_id}")
     result = run_cypher_(
         '''//cypher
-            match (a:Account{accountNumber: $accountNumber})
-            with a,     
-                collect { 
-                    match (c:Customer)-[:HAS_ACCOUNT]->(a)
-                    with c, 
-                    { 
-                        customer: c{.*},
-                        account_list: collect 
-                        {
-                            match (c)-[:HAS_ACCOUNT]->(a2)
-                            with a2, {
-                                account_number: a2.accountNumber,
-                                total_sent: collect{ match (a2)-[:PERFORM]->(tx) return sum(tx.amount) }[0],
-                                total_received: collect{ match (tx)-[:BENEFITS_TO]->(a2) return sum(tx.amount) }[0],
-                                number_of_transactions: count { (a2)-[:PERFORM|BENEFITS_TO]-(tx) }
-                            } as account_list
-                            return account_list
-                        } 
-                    } as customer_data
-                    return customer_data
-                }[0] as customer_info
-            return customer_info                      
+            match (c:Client{id: $client_id})
+            with c,
+            collect { match (c)-[:PERFORMED]->(tx) return sum(tx.amount) }[0] as total_money_sent,
+            collect { match (c)<-[:TO]-(tx) return sum(tx.amount) }[0] as total_money_recived,
+            count { match (c)-[:HAS_SSN]->()<-[:HAS_SSN]-() }>0 as ssn_shared_with_other_client,
+            count { match (c)-[:HAS_EMAIL]->()<-[:HAS_EMAIL]-() }>0 as email_shared_with_other_client,
+            count { match (c)-[:HAS_PHONE]->()<-[:HAS_PHONE]-() }>0 as phone_shared_with_other_client
+            return {
+                customer: c{.*},
+                total_money_sent: total_money_sent,
+                total_money_recived: total_money_recived,
+                ssn_shared_with_other_client: ssn_shared_with_other_client,
+                email_shared_with_other_client: email_shared_with_other_client,
+                phone_shared_with_other_client: phone_shared_with_other_client
+            }                 
         ''',
-        parameters={"accountNumber": request.accountNumber}, #"ACC_MULE_129"
+        parameters={"client_id": request.client_id},
         transformer=lambda result: result.single().data()
     )
     return result
