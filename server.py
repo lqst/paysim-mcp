@@ -1,6 +1,6 @@
 import uuid
 from fastmcp import FastMCP, Context
-from fastmcp.server.openapi import RouteMap, RouteType
+#from fastmcp.server.openapi import RouteMap, RouteType
 from duckduckgo_search import DDGS
 import logging
 import os
@@ -15,8 +15,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv(".env")
-client_secret=os.getenv('CLIENT_SECRET')
-client_id=os.getenv('CLIENT_ID')
+#client_secret=os.getenv('CLIENT_SECRET')
+#client_id=os.getenv('CLIENT_ID')
 database_uri=os.getenv('DB_URI')
 database_user=os.getenv('DB_USER')
 database_password=os.getenv('DB_PASSWORD')

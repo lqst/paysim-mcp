@@ -7,12 +7,12 @@ requires-python = ">=3.11"
 dependencies = [
     "asyncio>=3.4.3",
     "duckduckgo-search>=8.1.1",
-    "fastmcp>=2.3.4",
+    "fastmcp>=4.2.0",
     "httpx>=0.28.1",
     "neo4j>=5.28.2",
     "pydantic>=2.11.7",
-    "python-dotenv>=1.1.0",
+    "python-dotenv>=1.2.2",
     "pyyaml>=6.0.2",
-    "requests>=2.32.3",
+    "requests>=2.33.0",
     "uvicorn>=0.34.2",
 ]
